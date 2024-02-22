@@ -2,8 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const ShortUrl = require('./models/shortUrl'); // This will be your model
-
+const cors = require('cors')
 const app = express();
+app.use(cors({
+    origin: '*' // This will allow requests from any origin
+}));
 mongoose.connect(process.env.DATABASE_URL, { useNewUrlParser: true, useUnifiedTopology: true });
 // MongoDB connection success event
 mongoose.connection.on('connected', () => {
