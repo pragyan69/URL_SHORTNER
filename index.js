@@ -32,22 +32,33 @@ app.post('/shorten', async (req, res) => {
   
   // Route to redirect to the original URL and track click
   app.get('/:shortUrl', async (req, res) => {
-    const shortUrl = await ShortUrl.findOne({ shortUrl: req.params.shortUrl });
-    if (!shortUrl) {
-      return res.sendStatus(404);
-    }
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const clickIndex = shortUrl.clicks.findIndex(click => click.ip === ip);
+    const { shortUrl } = req.params;
+    const urlEntry = await ShortUrl.findOne({ shortUrl: shortUrl });
   
-    if (clickIndex >= 0) {
-      shortUrl.clicks[clickIndex].count++;
+    if (urlEntry) {
+      const ip = (req.headers['x-forwarded-for'] || '').split(',').shift().trim() || req.connection.remoteAddress;
+  
+      // Find an existing click entry for this IP
+      let clickEntry = urlEntry.clicks.find(click => click.ip === ip);
+  
+      if (clickEntry) {
+        // If found, increment the count
+        clickEntry.count += 1;
+      } else {
+        // Otherwise, add a new click record for this IP
+        if (!urlEntry.clicks) {
+          urlEntry.clicks = [];
+        }
+        urlEntry.clicks.push({ ip, count: 1 });
+      }
+  
+      await urlEntry.save();
+      res.redirect(urlEntry.originalUrl);
     } else {
-      shortUrl.clicks.push({ ip, count: 1 });
+      res.status(404).send('Shortened URL not found');
     }
-  
-    await shortUrl.save();
-    res.redirect(shortUrl.originalUrl);
   });
+  
 
   // Route to get click statistics
 app.get('/clicks/:shortUrl', async (req, res) => {
