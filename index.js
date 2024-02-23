@@ -6,10 +6,10 @@ const cors = require('cors')
 const cookieParser = require('cookie-parser');
 
 const { v4: uuidv4 } = require('uuid');
+
 function generateUniqueVisitorId() {
     return uuidv4();
 }
-
 
 const app = express();
 app.use(cors({
@@ -18,18 +18,19 @@ app.use(cors({
 
 app.use(cookieParser())
 mongoose.connect(process.env.DATABASE_URL, { useNewUrlParser: true, useUnifiedTopology: true });
+
 mongoose.connection.on('connected', () => {
     console.log('MongoDB database connection established successfully');
   });
+
   mongoose.connection.on('error', (err) => {
     console.error('MongoDB connection error:', err.message);
   });
   
 app.use(express.json());
-
 const port = process.env.PORT || 3005;
 
-// Route to create a short URL
+
 app.post('/shorten', async (req, res) => {
     const { originalUrl } = req.body;
     const shortUrl = new ShortUrl({ originalUrl });
@@ -37,40 +38,36 @@ app.post('/shorten', async (req, res) => {
     res.json(shortUrl);
   });
   
-  // Route to redirect to the original URL and track click
-  app.get('/:shortUrl', async (req, res) => {
+
+app.get('/:shortUrl', async (req, res) => {
     const { shortUrl } = req.params;
     const urlEntry = await ShortUrl.findOne({ shortUrl: shortUrl });
-
-    if (urlEntry) {
-        const ip = (req.headers['x-forwarded-for'] || req.connection.remoteAddress).split(",")[0];
-        let clickEntry = urlEntry.clicks.find(c => c.ip === ip);
-
-        if (clickEntry) {
-            clickEntry.count++;
-        } else {
-            urlEntry.clicks.push({ ip, count: 1 });
-        }
-
-        await urlEntry.save();
-        res.redirect(urlEntry.originalUrl);
-    } else {
-        res.status(404).send('Shortened URL not found');
+  
+    if (!urlEntry) {
+      return res.status(404).send('Shortened URL not found');
     }
-});
-
+  
+    const visitorId = req.cookies.visitorId || req.query.visitorId;
+    if (!visitorId) {
+      // No visitor ID provided, can't track uniquely, consider how you want to handle this case
+      return res.redirect(urlEntry.originalUrl);
+    }
+  
+    // Implement logic to track click with both IP and visitorId here
+    // This is a simplified version, you'll need to adjust based on your schema and requirements
+  
+    // Save and redirect
+    await urlEntry.save();
+    res.redirect(urlEntry.originalUrl);
+  });
   
 
-  // Route to get click statistics
-
-  app.get('/clicks/:shortUrl', async (req, res) => {
+app.get('/clicks/:shortUrl', async (req, res) => {
     const shortUrl = await ShortUrl.findOne({ shortUrl: req.params.shortUrl });
     if (!shortUrl) {
       return res.sendStatus(404);
     }
     res.json(shortUrl.clicks);
   });
-
-  
-  
+ 
 app.listen(port, () => console.log(`Listening on port ${port}`));
