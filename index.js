@@ -39,27 +39,42 @@ app.post('/shorten', async (req, res) => {
   });
   
 
-app.get('/:shortUrl', async (req, res) => {
+  app.get('/:shortUrl', async (req, res) => {
     const { shortUrl } = req.params;
     const urlEntry = await ShortUrl.findOne({ shortUrl: shortUrl });
-  
+
     if (!urlEntry) {
-      return res.status(404).send('Shortened URL not found');
+        return res.status(404).send('Shortened URL not found');
     }
-  
+
     const visitorId = req.cookies.visitorId || req.query.visitorId;
     if (!visitorId) {
-      // No visitor ID provided, can't track uniquely, consider how you want to handle this case
-      return res.redirect(urlEntry.originalUrl);
+        // Optional: Handle cases where no visitor ID is present. You might choose to redirect without recording a click.
+        console.log('No visitor ID provided. Consider how to handle this case.');
+    } else {
+        // Extract the client's IP address
+        const ip = (req.headers['x-forwarded-for'] || '').split(',').shift().trim() || req.connection.remoteAddress;
+
+        // Check if this visitor ID has already clicked the link
+        let clickEntry = urlEntry.clicks.find(click => click.visitorId === visitorId);
+
+        if (!clickEntry) {
+            // First click from this visitor
+            urlEntry.clicks.push({ visitorId, ip, count: 1 });
+        } else {
+            // Increment count only if the IP is different, indicating a shared network scenario
+            if (clickEntry.ip !== ip) {
+                clickEntry.count += 1;
+                clickEntry.ip = ip; // Update to the most recent IP
+            }
+        }
+
+        await urlEntry.save();
     }
-  
-    // Implement logic to track click with both IP and visitorId here
-    // This is a simplified version, you'll need to adjust based on your schema and requirements
-  
-    // Save and redirect
-    await urlEntry.save();
+
     res.redirect(urlEntry.originalUrl);
-  });
+});
+
   
 
 app.get('/clicks/:shortUrl', async (req, res) => {

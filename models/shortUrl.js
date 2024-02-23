@@ -1,10 +1,15 @@
 const mongoose = require('mongoose');
-const shortId = require('shortid');
+
+const clickSchema = new mongoose.Schema({
+    visitorId: String,
+    ip: String,
+    count: Number,
+});
 
 const shortUrlSchema = new mongoose.Schema({
-  originalUrl: String,
-  shortUrl: { type: String, unique: true, default: shortId.generate },
-  clicks: [{ ip: String, count: Number }]
+    originalUrl: String,
+    shortUrl: { type: String, unique: true },
+    clicks: [clickSchema],
 });
 
 module.exports = mongoose.model('ShortUrl', shortUrlSchema);
